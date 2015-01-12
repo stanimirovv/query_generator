@@ -2,23 +2,30 @@ use strict;
 use warnings;
 use Data::Dumper;
 use DBI;
-
-my $schema =
-{
- blue => {red => {is_nullable => 0, column => "red_id"}},
- red => {pink => {is_nullable => 0, column => "pink_id"}, green => {is_nullable => 1, column => "green_id"}},
- pink => {black => {is_nullable => 0, column => "black_id"}},
- black => {white => {is_nullable => 1, column => "white_id"}},
- green => {green => {is_nullable => 0, column => "green_id"}, black => {is_nullable => 1, column => "black_id"}, yellow => {is_nullable => 0, column => "yellow_id"}},
- yellow => {brown => {is_nullable => 0, column => "brown_id"}, cian => {is_nullable => 0, column => "cian_id"}, orange => {is_nullable => 1, column => "orange_id"}},
- white => {blue => {is_nullable => 1, column => "blue_id"}}
-};
-
+ 
 sub CreateSchemaHash()
 {
     my $dbh = DBI->connect('dbi:Pg:dbname=querygenerator;host=localhost','postgres','123',{AutoCommit=>1,RaiseError=>1,PrintError=>0});
  
     my $sth = $dbh->prepare("SELECT * FROM information_schema.columns where table_catalog='querygenerator' AND table_schema='public'");
+    $sth->execute();
+ 
+    $sth = $dbh->prepare("
+         SELECT
+             tc.constraint_name, tc.table_name, kcu.column_name,
+          ccu.table_name AS foreign_table_name,
+          ccu.column_name AS foreign_column_name,
+          cl.is_nullable
+          FROM
+              information_schema.table_constraints AS tc
+              JOIN information_schema.key_column_usage AS kcu
+                  ON tc.constraint_name = kcu.constraint_name
+              JOIN information_schema.constraint_column_usage AS ccu
+                  ON ccu.constraint_name = tc.constraint_name
+              JOIN information_schema.columns AS cl
+                  ON cl.column_name = kcu.column_name AND cl.table_name = kcu.table_name
+          WHERE constraint_type = 'FOREIGN KEY';
+      ");
     $sth->execute();
  
     my $hash = {};
@@ -30,56 +37,18 @@ sub CreateSchemaHash()
             $$hash{ $$row{table_name} } = {};
         }
  
-        $$hash{ $$row{table_name} }{ $$row{column_name} } = 2;
-   
-        if($$row{is_nullable} eq "NO")
-        {
-            $$hash{ $$row{table_name} }{ $$row{column_name} } = 1;
-        }
- 
-    }
- 
-    print Dumper $hash;
- 
-    $sth = $dbh->prepare("
-           SELECT
-               tc.constraint_name, tc.table_name, kcu.column_name,
-            ccu.table_name AS foreign_table_name,
-            ccu.column_name AS foreign_column_name,
-            cl.is_nullable
-            FROM
-                information_schema.table_constraints AS tc
-                JOIN information_schema.key_column_usage AS kcu
-                    ON tc.constraint_name = kcu.constraint_name
-                JOIN information_schema.constraint_column_usage AS ccu
-                    ON ccu.constraint_name = tc.constraint_name
-                JOIN information_schema.columns AS cl
-                    ON cl.column_name = kcu.column_name AND cl.table_name = kcu.table_name
-            WHERE constraint_type = 'FOREIGN KEY';
-        ");
-    $sth->execute();
- 
-    my $hash2 = {};
- 
-    while(my $row = $sth->fetchrow_hashref())
-    {
-        if(!defined $$hash2{ $$row{table_name} })
-        {
-            $$hash2{ $$row{table_name} } = {};
-        }
- 
-        $$hash2{ $$row{table_name} }{ $$row{foreign_table_name} } = {is_nullable => 1, column => $$row{column_name}};
+        $$hash{ $$row{table_name} }{ $$row{foreign_table_name} } = {is_nullable => 1, column => $$row{column_name}};
    
         if( $$row{is_nullable} eq "NO")
         {
-            $$hash2{ $$row{table_name} }{ $$row{foreign_table_name} }{is_nullable} = 0;
+            $$hash{ $$row{table_name} }{ $$row{foreign_table_name} }{is_nullable} = 0;
         }
  
     }
-    print Dumper($hash2);
-    return $hash2;
+ 
+    return $hash;
 }
-
+ 
 #my $routes = {};
 sub GraphTraversalHelper
 {
@@ -109,7 +78,7 @@ sub GraphTraversalHelper
     foreach my $points_to (@sortedTables)
     {
  
-        print "Points to: $points_to \n";
+        #print "Points to: $points_to \n";
         my $is_ljoin_new = 0;
        
         if(!defined($$cycles{"$start_from-$points_to"}))
@@ -175,8 +144,8 @@ sub GraphTraversal($$$)
  
 sub Main()
 {
-    #my $schema = CreateSchemaHash();
-    print GraphTraversal(CreateSchemaHash(), "blue", 1), "\n";
+    my $schema = CreateSchemaHash();
+    print GraphTraversal($schema, "blue", 3), "\n";
 }
  
 Main();
