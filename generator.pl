@@ -3,6 +3,19 @@ use warnings;
 use Data::Dumper;
 use DBI;
  
+=pod
+my $schema =
+{
+ blue => {red => {is_nullable => 0, column => "red_id"}},
+ red => {pink => {is_nullable => 0, column => "pink_id"}, green => {is_nullable => 1, column => "green_id"}},
+ pink => {black => {is_nullable => 0, column => "black_id"}},
+ black => {white => {is_nullable => 1, column => "white_id"}},
+ green => {green => {is_nullable => 0, column => "green_id"}, black => {is_nullable => 1, column => "black_id"}, yellow => {is_nullable => 0, column => "yellow_id"}},
+ yellow => {brown => {is_nullable => 0, column => "brown_id"}, cian => {is_nullable => 0, column => "cian_id"}, orange => {is_nullable => 1, column => "orange_id"}},
+ white => {blue => {is_nullable => 1, column => "blue_id"}}
+};
+=cut
+
 sub CreateSchemaHash()
 {
     my $dbh = DBI->connect('dbi:Pg:dbname=querygenerator;host=localhost','postgres','123',{AutoCommit=>1,RaiseError=>1,PrintError=>0});
